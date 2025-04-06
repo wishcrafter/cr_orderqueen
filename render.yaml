@@ -2,6 +2,8 @@ services:
   - type: web
     name: orderqueen-collector
     env: python
+    region: singapore
+    plan: free
     buildCommand: |
       apt-get update && \
       apt-get install -y wget gnupg && \
@@ -12,8 +14,7 @@ services:
       pip install -r requirements.txt && \
       playwright install && \
       playwright install-deps
-    startCommand: |
-      xvfb-run --auto-servernum -- python app.py
+    startCommand: python app.py
     envVars:
       - key: OQ_ID
         sync: false
@@ -22,4 +23,6 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
-        sync: false 
+        sync: false
+    healthCheckPath: /api/health
+    autoDeploy: true 
