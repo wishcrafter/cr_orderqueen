@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: orderqueen-collector
+    env: python
+    buildCommand: |
+      apt-get update && \
+      apt-get install -y wget gnupg && \
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
+      apt-get update && \
+      apt-get install -y google-chrome-stable xvfb && \
+      pip install -r requirements.txt && \
+      playwright install && \
+      playwright install-deps
+    startCommand: |
+      xvfb-run --auto-servernum -- python app.py
+    envVars:
+      - key: OQ_ID
+        sync: false
+      - key: OQ_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false 
