@@ -214,20 +214,28 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
         page = await context.new_page()
         
         try:
-            print("로그인 중...")
-            await page.goto('https://www.orderqueen.kr/backoffice_admin/login.itp')
+            print("로그인 페이지 접속 중...")
+            await page.goto('https://www.orderqueen.kr/backoffice_admin/login.itp', wait_until='networkidle')
+            await page.wait_for_timeout(3000)  # 3초 대기
+            
+            print(f"로그인 시도 중... (ID: {user_id})")
+            await page.fill('input[name="userId"]', user_id)
+            await page.fill('input[name="pw"]', password)
+            
+            await page.click('#btnLoginNew')
             await page.wait_for_load_state('networkidle')
+            await page.wait_for_timeout(5000)  # 5초 대기
             
-            id_input = await page.wait_for_selector('input[name="userId"]')
-            await id_input.fill(user_id)
+            # 로그인 상태 확인
+            current_url = page.url
+            print(f"현재 URL: {current_url}")
             
-            pw_input = await page.wait_for_selector('input[name="pw"]')
-            await pw_input.fill(password)
+            if 'login.itp' in current_url:
+                print("로그인 실패: 여전히 로그인 페이지에 있습니다.")
+                await page.screenshot(path='login_failed.png')
+                raise Exception("로그인 실패")
             
-            login_button = await page.wait_for_selector('#btnLoginNew')
-            await login_button.click()
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(2000)
+            print("로그인 성공")
             
             for store_id in TARGET_STORES:
                 try:
@@ -245,24 +253,22 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
                     }
                     
                     download_url = f'https://www.orderqueen.kr/backoffice_admin/BSL01010_EXCEL.itp?{urlencode(params)}'
+                    print(f"다운로드 URL: {download_url}")
                     
                     async with page.expect_download(timeout=60000) as download_info:
-                        await page.evaluate(f"window.location.href = '{download_url}'")
-                        try:
-                            download = await download_info.value
-                            downloaded_path = await download.path()
-                            # WindowsPath를 문자열로 변환
-                            downloaded_path_str = str(downloaded_path)
-                            downloaded_files.append((downloaded_path_str, store_id))
-                            print(f"{store_id} 매장 다운로드 완료: {downloaded_path_str}")
-                        except Exception as e:
-                            print(f"{store_id} 매장 다운로드 실패: {str(e)}")
-                            continue
+                        await page.goto(download_url, wait_until='networkidle')
+                        await page.wait_for_timeout(3000)  # 3초 대기
+                        download = await download_info.value
+                        downloaded_path = await download.path()
+                        # WindowsPath를 문자열로 변환
+                        downloaded_path_str = str(downloaded_path)
+                        downloaded_files.append((downloaded_path_str, store_id))
+                        print(f"{store_id} 매장 다운로드 완료: {downloaded_path_str}")
                     
                     await page.wait_for_timeout(3000)
                     
                 except Exception as e:
-                    print(f"{store_id} 매장 처리 중 에러 발생: {str(e)}")
+                    print(f"{store_id} 매장 다운로드 실패: {str(e)}")
                     continue
             
             print("\n다운로드된 파일 처리 중...")
