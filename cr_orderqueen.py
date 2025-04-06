@@ -128,26 +128,37 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         supabase_url = os.getenv('SUPABASE_URL')
         supabase_key = os.getenv('SUPABASE_KEY')
         
-        print(f"\nSupabase URL: {supabase_url[:20]}...")  # URL의 일부만 출력
-        print(f"Supabase Key: {supabase_key[:10]}...")  # Key의 일부만 출력
+        print(f"\nSupabase URL: {supabase_url[:20] if supabase_url else 'None'}...")
+        print(f"Supabase Key: {supabase_key[:10] if supabase_key else 'None'}...")
         
         if not supabase_url or not supabase_key:
             raise ValueError('Supabase 연결 정보가 없습니다.')
         
-        print("\nSupabase 연결 시도...")
-        supabase = create_client(supabase_url, supabase_key)
+        print("\nSupabase 클라이언트 생성 시도...")
+        try:
+            supabase = create_client(supabase_url, supabase_key)
+            print("Supabase 클라이언트 생성 성공")
+        except Exception as e:
+            print(f"Supabase 클라이언트 생성 실패: {str(e)}")
+            if hasattr(e, '__dict__'):
+                print(f"클라이언트 생성 에러 상세: {e.__dict__}")
+            raise
         
         records = df_processed.to_dict('records')
         print(f"업로드할 레코드 수: {len(records)}")
         print("\n첫 번째 레코드 샘플:")
         print(records[0] if records else "레코드 없음")
         
-        print("\nSupabase에 데이터 업로드 중...")
+        print("\nSupabase 테이블 업로드 시도...")
         try:
-            result = await supabase.table('sales').upsert(
+            print("1. 테이블 접근...")
+            table = supabase.table('sales')
+            print("2. Upsert 실행...")
+            result = await table.upsert(
                 records,
                 on_conflict='store_id,sales_date'
             ).execute()
+            print("3. 실행 완료")
             print(f"\nSupabase 응답 데이터: {result.data if hasattr(result, 'data') else '없음'}")
             print(f"Supabase 응답 에러: {result.error if hasattr(result, 'error') else '없음'}")
         except Exception as e:
