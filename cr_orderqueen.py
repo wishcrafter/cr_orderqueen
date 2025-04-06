@@ -205,26 +205,37 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer'
+            ]
         )
         context = await browser.new_context(
             accept_downloads=True,
-            viewport={'width': 1920, 'height': 1080}
+            viewport={'width': 1920, 'height': 1080},
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
         )
         page = await context.new_page()
         
         try:
             print("로그인 페이지 접속 중...")
-            await page.goto('https://www.orderqueen.kr/backoffice_admin/login.itp', wait_until='networkidle')
-            await page.wait_for_timeout(3000)  # 3초 대기
+            await page.goto(
+                'https://www.orderqueen.kr/backoffice_admin/login.itp',
+                wait_until='networkidle',
+                timeout=60000  # 60초로 증가
+            )
+            await page.wait_for_timeout(5000)  # 5초 대기
             
             print(f"로그인 시도 중... (ID: {user_id})")
-            await page.fill('input[name="userId"]', user_id)
-            await page.fill('input[name="pw"]', password)
+            await page.fill('input[name="userId"]', user_id, timeout=30000)
+            await page.fill('input[name="pw"]', password, timeout=30000)
             
             await page.click('#btnLoginNew')
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(5000)  # 5초 대기
+            await page.wait_for_load_state('networkidle', timeout=60000)
+            await page.wait_for_timeout(10000)  # 10초 대기
             
             # 로그인 상태 확인
             current_url = page.url
@@ -255,20 +266,31 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
                     download_url = f'https://www.orderqueen.kr/backoffice_admin/BSL01010_EXCEL.itp?{urlencode(params)}'
                     print(f"다운로드 URL: {download_url}")
                     
-                    async with page.expect_download(timeout=60000) as download_info:
-                        await page.goto(download_url, wait_until='networkidle')
-                        await page.wait_for_timeout(3000)  # 3초 대기
-                        download = await download_info.value
-                        downloaded_path = await download.path()
-                        # WindowsPath를 문자열로 변환
-                        downloaded_path_str = str(downloaded_path)
-                        downloaded_files.append((downloaded_path_str, store_id))
-                        print(f"{store_id} 매장 다운로드 완료: {downloaded_path_str}")
+                    async with page.expect_download(timeout=120000) as download_info:  # 120초로 증가
+                        await page.goto(
+                            download_url,
+                            wait_until='networkidle',
+                            timeout=60000  # 60초로 증가
+                        )
+                        await page.wait_for_timeout(5000)  # 5초 대기
+                        
+                        try:
+                            download = await download_info.value
+                            downloaded_path = await download.path()
+                            downloaded_path_str = str(downloaded_path)
+                            downloaded_files.append((downloaded_path_str, store_id))
+                            print(f"{store_id} 매장 다운로드 완료: {downloaded_path_str}")
+                        except TimeoutError:
+                            print(f"{store_id} 매장 다운로드 시간 초과")
+                            await page.screenshot(path=f'download_timeout_{store_id}.png')
+                            raise
                     
-                    await page.wait_for_timeout(3000)
+                    await page.wait_for_timeout(5000)  # 5초 대기
                     
                 except Exception as e:
                     print(f"{store_id} 매장 다운로드 실패: {str(e)}")
+                    if hasattr(e, '__dict__'):
+                        print(f"에러 상세 정보: {e.__dict__}")
                     continue
             
             print("\n다운로드된 파일 처리 중...")
