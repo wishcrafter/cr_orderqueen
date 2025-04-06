@@ -94,7 +94,11 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         bool: 업로드 성공 여부
     """
     try:
+        print(f"\n=== Supabase 업로드 시작 ({store_id}) ===")
+        print(f"파일 경로: {file_path}")
+        
         df = pd.read_excel(file_path, header=2)
+        print(f"엑셀 파일 읽기 완료: {len(df)} 행")
         
         df_processed = pd.DataFrame({
             'sales_date': df.iloc[:, 0],
@@ -106,6 +110,7 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
             'etc_amount': df.iloc[:, 13]
         })
         
+        print("데이터 전처리 시작...")
         df_processed['sales_date'] = pd.to_datetime(df_processed['sales_date']).dt.strftime('%Y-%m-%d')
         df_processed['total_amount'] = pd.to_numeric(df_processed['total_amount'], errors='coerce')
         df_processed['transaction_count'] = pd.to_numeric(df_processed['transaction_count'], errors='coerce')
@@ -114,6 +119,7 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         df_processed['etc_amount'] = pd.to_numeric(df_processed['etc_amount'], errors='coerce')
         
         df_processed = df_processed.fillna(0)
+        print("데이터 전처리 완료")
         
         print("\n=== 처리된 데이터 샘플 ===")
         print(df_processed.head())
@@ -125,20 +131,27 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         if not supabase_url or not supabase_key:
             raise ValueError('Supabase 연결 정보가 없습니다.')
         
+        print("\nSupabase 연결 시도...")
         supabase = create_client(supabase_url, supabase_key)
         
         records = df_processed.to_dict('records')
+        print(f"업로드할 레코드 수: {len(records)}")
         
+        print("Supabase에 데이터 업로드 중...")
         result = await supabase.table('sales').upsert(
             records,
             on_conflict='store_id,sales_date'
         ).execute()
         
+        print(f"\nSupabase 응답: {result}")
         print(f"\n{store_id} 매장 데이터 업로드 완료 (기존 데이터는 업데이트)")
         return True
         
     except Exception as e:
-        print(f"데이터 업로드 실패 ({store_id}): {str(e)}")
+        print(f"\n=== Supabase 업로드 실패 ===")
+        print(f"매장 ID: {store_id}")
+        print(f"에러 메시지: {str(e)}")
+        print(f"에러 타입: {type(e)}")
         return False
 
 async def download_daily_sales(start_date: str, end_date: str) -> list:
@@ -160,8 +173,14 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
     downloaded_files = []
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context(accept_downloads=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        )
+        context = await browser.new_context(
+            accept_downloads=True,
+            viewport={'width': 1920, 'height': 1080}
+        )
         page = await context.new_page()
         
         try:
