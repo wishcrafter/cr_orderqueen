@@ -154,13 +154,19 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
             print("1. 테이블 접근...")
             table = supabase.table('sales')
             print("2. Upsert 실행...")
-            result = await table.upsert(
+            result = table.upsert(
                 records,
                 on_conflict='store_id,sales_date'
             ).execute()
             print("3. 실행 완료")
             print(f"\nSupabase 응답 데이터: {result.data if hasattr(result, 'data') else '없음'}")
-            print(f"Supabase 응답 에러: {result.error if hasattr(result, 'error') else '없음'}")
+            if hasattr(result, 'data') and result.data:
+                print(f"업로드된 레코드 수: {len(result.data)}")
+                print(f"\n{store_id} 매장 데이터 업로드 성공 (총 {len(result.data)}개 레코드)")
+                return True
+            else:
+                print(f"\n{store_id} 매장 데이터 업로드 실패: 응답 데이터 없음")
+                return False
         except Exception as e:
             print(f"\nSupabase 업로드 중 예외 발생:")
             print(f"예외 타입: {type(e)}")
@@ -168,9 +174,6 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
             if hasattr(e, '__dict__'):
                 print(f"예외 상세 정보: {e.__dict__}")
             raise
-        
-        print(f"\n{store_id} 매장 데이터 업로드 완료 (기존 데이터는 업데이트)")
-        return True
         
     except Exception as e:
         print(f"\n=== Supabase 업로드 실패 ===")
