@@ -160,7 +160,7 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
     downloaded_files = []
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(accept_downloads=True)
         page = await context.new_page()
         
