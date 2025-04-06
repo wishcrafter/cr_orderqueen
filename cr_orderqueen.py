@@ -128,6 +128,9 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         supabase_url = os.getenv('SUPABASE_URL')
         supabase_key = os.getenv('SUPABASE_KEY')
         
+        print(f"\nSupabase URL: {supabase_url[:20]}...")  # URL의 일부만 출력
+        print(f"Supabase Key: {supabase_key[:10]}...")  # Key의 일부만 출력
+        
         if not supabase_url or not supabase_key:
             raise ValueError('Supabase 연결 정보가 없습니다.')
         
@@ -136,14 +139,25 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         
         records = df_processed.to_dict('records')
         print(f"업로드할 레코드 수: {len(records)}")
+        print("\n첫 번째 레코드 샘플:")
+        print(records[0] if records else "레코드 없음")
         
-        print("Supabase에 데이터 업로드 중...")
-        result = await supabase.table('sales').upsert(
-            records,
-            on_conflict='store_id,sales_date'
-        ).execute()
+        print("\nSupabase에 데이터 업로드 중...")
+        try:
+            result = await supabase.table('sales').upsert(
+                records,
+                on_conflict='store_id,sales_date'
+            ).execute()
+            print(f"\nSupabase 응답 데이터: {result.data if hasattr(result, 'data') else '없음'}")
+            print(f"Supabase 응답 에러: {result.error if hasattr(result, 'error') else '없음'}")
+        except Exception as e:
+            print(f"\nSupabase 업로드 중 예외 발생:")
+            print(f"예외 타입: {type(e)}")
+            print(f"예외 메시지: {str(e)}")
+            if hasattr(e, '__dict__'):
+                print(f"예외 상세 정보: {e.__dict__}")
+            raise
         
-        print(f"\nSupabase 응답: {result}")
         print(f"\n{store_id} 매장 데이터 업로드 완료 (기존 데이터는 업데이트)")
         return True
         
@@ -152,6 +166,8 @@ async def upload_to_supabase(file_path: str, store_id: str) -> bool:
         print(f"매장 ID: {store_id}")
         print(f"에러 메시지: {str(e)}")
         print(f"에러 타입: {type(e)}")
+        if hasattr(e, '__dict__'):
+            print(f"에러 상세 정보: {e.__dict__}")
         return False
 
 async def download_daily_sales(start_date: str, end_date: str) -> list:
