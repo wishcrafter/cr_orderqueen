@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: orderqueen-collector
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: |
+      apt-get update && \
+      apt-get install -y xvfb && \
+      pip install -r requirements.txt && \
+      playwright install && \
+      playwright install-deps chromium && \
+      chmod -R 777 /opt/render/.cache/ms-playwright
+    startCommand: |
+      xvfb-run --server-args="-screen 0 1280x960x24" python app.py
+    envVars:
+      - key: OQ_ID
+        sync: false
+      - key: OQ_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+    healthCheckPath: /api/health
+    autoDeploy: true 
