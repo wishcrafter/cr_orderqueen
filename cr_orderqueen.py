@@ -218,16 +218,24 @@ async def download_daily_sales(start_date: str, end_date: str) -> list:
             await page.goto('https://www.orderqueen.kr/backoffice_admin/login.itp')
             await page.wait_for_load_state('networkidle')
             
-            id_input = await page.wait_for_selector('input[name="userId"]')
+            # 로그인 폼이 완전히 로드될 때까지 대기
+            await page.wait_for_selector('input[name="userId"]', timeout=60000)
+            await page.wait_for_timeout(2000)  # 추가 대기
+            
+            id_input = await page.wait_for_selector('input[name="userId"]', timeout=60000)
             await id_input.fill(user_id)
+            await page.wait_for_timeout(1000)  # 입력 후 대기
             
-            pw_input = await page.wait_for_selector('input[name="pw"]')
+            pw_input = await page.wait_for_selector('input[name="pw"]', timeout=60000)
             await pw_input.fill(password)
+            await page.wait_for_timeout(1000)  # 입력 후 대기
             
-            login_button = await page.wait_for_selector('#btnLoginNew')
+            login_button = await page.wait_for_selector('#btnLoginNew', timeout=60000)
             await login_button.click()
-            await page.wait_for_load_state('networkidle')
-            await page.wait_for_timeout(2000)
+            
+            # 로그인 후 페이지 로딩 대기
+            await page.wait_for_load_state('networkidle', timeout=60000)
+            await page.wait_for_timeout(5000)  # 로그인 후 추가 대기
             
             for store_id in TARGET_STORES:
                 try:
